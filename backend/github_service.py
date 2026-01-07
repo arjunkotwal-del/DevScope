@@ -23,7 +23,7 @@ class GitHubService:
         from urllib.parse import urlencode
         
         # Use production backend URL
-        backend_url = os.environ.get('REACT_APP_BACKEND_URL', 'http://localhost:8001')
+        backend_url = os.environ.get('BACKEND_URL', 'https://gitmetrics.preview.emergentagent.com')
         redirect_uri = f"{backend_url}/api/auth/github/callback"
         
         params = {
