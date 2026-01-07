@@ -13,6 +13,7 @@ import uuid
 from datetime import datetime, timezone, timedelta
 import jwt
 from passlib.context import CryptContext
+import httpx
 from github_service import github_service
 
 ROOT_DIR = Path(__file__).parent
