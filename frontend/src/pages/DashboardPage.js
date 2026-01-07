@@ -198,20 +198,50 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Repository Selection */}
-      <div className="flex gap-3 flex-wrap">
-        {repositories.map(repo => (
+      {repositories.length === 0 ? (
+        <Card className="bg-zinc-900 border-zinc-800 p-12 text-center">
+          <Github className="h-16 w-16 text-zinc-600 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-white mb-2">No Repositories Yet</h3>
+          <p className="text-zinc-400 mb-6">
+            Login with GitHub or import your repositories to start analyzing your engineering metrics
+          </p>
           <Button
-            key={repo.id}
-            onClick={() => setSelectedRepo(repo)}
-            variant={selectedRepo?.id === repo.id ? 'default' : 'outline'}
-            className={selectedRepo?.id === repo.id ? 'bg-indigo-600 hover:bg-indigo-700' : 'border-zinc-700'}
-            data-testid={`repo-button-${repo.id}`}
+            onClick={importRepositories}
+            disabled={importing}
+            className="bg-indigo-600 hover:bg-indigo-700"
+            data-testid="import-repos-empty-state"
           >
-            {repo.name}
+            {importing ? 'Importing...' : 'Import Repositories'}
           </Button>
-        ))}
-      </div>
+        </Card>
+      ) : (
+        <>
+          {/* Repository Selection */}
+          <div className="flex gap-3 flex-wrap items-center">
+            {repositories.map(repo => (
+              <Button
+                key={repo.id}
+                onClick={() => setSelectedRepo(repo)}
+                variant={selectedRepo?.id === repo.id ? 'default' : 'outline'}
+                className={selectedRepo?.id === repo.id ? 'bg-indigo-600 hover:bg-indigo-700' : 'border-zinc-700'}
+                data-testid={`repo-button-${repo.id}`}
+              >
+                {repo.name}
+              </Button>
+            ))}
+            {selectedRepo && (
+              <Button
+                onClick={() => syncRepo(selectedRepo.id)}
+                variant="ghost"
+                size="sm"
+                className="text-zinc-400 hover:text-white"
+                data-testid="sync-repo-button"
+              >
+                <RefreshCw className="h-4 w-4 mr-1" />
+                Sync
+              </Button>
+            )}
+          </div>
 
       {selectedRepo && (
         <>
