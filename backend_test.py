@@ -235,6 +235,22 @@ def main():
         print("❌ Analytics overview failed")
         return 1
 
+    # Test GitHub OAuth and error scenarios
+    print("\n📋 GITHUB OAUTH TESTS")
+    print("-" * 30)
+    
+    if not tester.test_github_oauth_url():
+        print("❌ GitHub OAuth URL generation failed")
+    
+    if not tester.test_import_repositories_without_github():
+        print("❌ Import repositories error handling failed")
+    
+    print("\n📋 UNAUTHORIZED ACCESS TESTS")
+    print("-" * 30)
+    
+    if not tester.test_unauthorized_requests():
+        print("❌ Unauthorized access test failed")
+
     # Test repository-specific analytics if we have repositories
     if tester.repositories and len(tester.repositories) > 0:
         first_repo = tester.repositories[0]
