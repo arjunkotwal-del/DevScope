@@ -1,26 +1,24 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 
 export default function AuthCallback() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { handleCallback } = useAuth();
 
   useEffect(() => {
     const token = searchParams.get('token');
     const error = searchParams.get('error');
 
     if (error) {
-      navigate('/?error=' + error);
+      navigate('/auth?error=' + error);
       return;
     }
 
     if (token) {
       localStorage.setItem('devscope_token', token);
-      navigate('/');
+      window.location.href = '/dashboard';
     } else {
-      navigate('/');
+      navigate('/auth');
     }
   }, [searchParams, navigate]);
 
