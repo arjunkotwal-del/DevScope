@@ -4,9 +4,11 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { Toaster } from "./components/ui/sonner";
+import LandingPage from "./pages/LandingPage";
 import AuthPage from "./pages/AuthPage";
 import AuthCallback from "./pages/AuthCallback";
 import DashboardPage from "./pages/DashboardPage";
+import SettingsPage from "./pages/SettingsPage";
 import DashboardLayout from "./components/DashboardLayout";
 
 function PrivateRoute({ children }) {
@@ -34,12 +36,13 @@ function PublicRoute({ children }) {
     );
   }
   
-  return !user ? children : <Navigate to="/" replace />;
+  return !user ? children : <Navigate to="/dashboard" replace />;
 }
 
 function AppRoutes() {
   return (
     <Routes>
+      <Route path="/" element={<LandingPage />} />
       <Route
         path="/auth"
         element={
@@ -50,11 +53,21 @@ function AppRoutes() {
       />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route
-        path="/"
+        path="/dashboard"
         element={
           <PrivateRoute>
             <DashboardLayout>
               <DashboardPage />
+            </DashboardLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <PrivateRoute>
+            <DashboardLayout>
+              <SettingsPage />
             </DashboardLayout>
           </PrivateRoute>
         }
