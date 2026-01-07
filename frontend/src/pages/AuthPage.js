@@ -5,8 +5,12 @@ import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
 import { Label } from '../components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Code2, TrendingUp, BarChart3 } from 'lucide-react';
+import { Code2, TrendingUp, BarChart3, Github } from 'lucide-react';
 import { toast } from 'sonner';
+import axios from 'axios';
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const API = `${BACKEND_URL}/api`;
 
 export default function AuthPage() {
   const { login, register } = useAuth();
@@ -15,6 +19,19 @@ export default function AuthPage() {
   
   const [loginData, setLoginData] = useState({ email: 'demo@devscope.com', password: 'demo123' });
   const [registerData, setRegisterData] = useState({ email: '', name: '', password: '' });
+
+  const handleGitHubLogin = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get(`${API}/auth/github/login`);
+      if (response.data.auth_url) {
+        window.location.href = response.data.auth_url;
+      }
+    } catch (error) {
+      toast.error('Failed to initiate GitHub login');
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -80,8 +97,27 @@ export default function AuthPage() {
         </div>
 
         <Card className="bg-zinc-900 border-zinc-800 p-8 shadow-2xl">
+          <Button
+            onClick={handleGitHubLogin}
+            disabled={loading}
+            className="w-full bg-zinc-800 hover:bg-zinc-700 text-white mb-6 h-12 text-base font-semibold"
+            data-testid="github-login-button"
+          >
+            <Github className="h-5 w-5 mr-2" />
+            {loading ? 'Connecting...' : 'Continue with GitHub'}
+          </Button>
+          
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-zinc-800" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-zinc-900 px-2 text-zinc-500">Or</span>
+            </div>
+          </div>
+
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-8" data-testid="auth-tabs">
+            <TabsList className="grid w-full grid-cols-2 mb-6" data-testid="auth-tabs">
               <TabsTrigger value="login" data-testid="login-tab">Login</TabsTrigger>
               <TabsTrigger value="register" data-testid="register-tab">Register</TabsTrigger>
             </TabsList>
@@ -94,7 +130,7 @@ export default function AuthPage() {
                     id="login-email"
                     data-testid="login-email-input"
                     type="email"
-                    placeholder="[email protected]"
+                    placeholder="demo@devscope.com"
                     value={loginData.email}
                     onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
                     required
@@ -121,7 +157,7 @@ export default function AuthPage() {
                 >
                   {loading ? 'Signing in...' : 'Sign In'}
                 </Button>
-                  <p className="text-xs text-zinc-500 text-center">
+                <p className="text-xs text-zinc-500 text-center">
                   Demo: demo@devscope.com / demo123
                 </p>
               </form>
