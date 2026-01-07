@@ -330,6 +330,79 @@ async def get_repositories(current_user: User = Depends(get_current_user)):
             repo["last_synced"] = datetime.fromisoformat(repo["last_synced"])
     return repos
 
+class RepositoryAdd(BaseModel):
+    repo_url: str
+
+@api_router.post("/repositories/add")
+async def add_repository(
+    repo_data: RepositoryAdd,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user)
+):
+    """Add a specific repository by GitHub URL"""
+    if not current_user.github_token:
+        raise HTTPException(status_code=400, detail="GitHub token not found. Please connect your GitHub account in Settings.")
+    
+    # Parse GitHub URL (e.g., https://github.com/owner/repo)
+    import re
+    match = re.match(r'https?://github\.com/([^/]+)/([^/]+)/?', repo_data.repo_url.strip())
+    if not match:
+        raise HTTPException(status_code=400, detail="Invalid GitHub repository URL. Format: https://github.com/owner/repo")
+    
+    owner, repo_name = match.groups()
+    repo_name = repo_name.replace('.git', '')
+    
+    # Fetch repo info from GitHub
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.get(
+                f"https://api.github.com/repos/{owner}/{repo_name}",
+                headers={
+                    "Authorization": f"Bearer {current_user.github_token}",
+                    "Accept": "application/vnd.github.v3+json"
+                }
+            )
+            
+            if response.status_code != 200:
+                raise HTTPException(status_code=404, detail="Repository not found or you don't have access")
+            
+            github_repo = response.json()
+            
+        except httpx.TimeoutException:
+            raise HTTPException(status_code=408, detail="GitHub API timeout")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to fetch repository: {str(e)}")
+    
+    # Check if already exists
+    existing = await db.repositories.find_one({"github_id": github_repo["id"]})
+    if existing:
+        raise HTTPException(status_code=400, detail="Repository already added")
+    
+    # Create repository record
+    repo = {
+        "id": str(uuid.uuid4()),
+        "user_id": current_user.id,
+        "github_id": github_repo["id"],
+        "name": github_repo["name"],
+        "full_name": github_repo["full_name"],
+        "owner": github_repo["owner"]["login"],
+        "description": github_repo.get("description"),
+        "url": github_repo["html_url"],
+        "is_private": github_repo["private"],
+        "language": github_repo.get("language"),
+        "stars": github_repo.get("stargazers_count", 0),
+        "forks": github_repo.get("forks_count", 0),
+        "last_synced": None,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.repositories.insert_one(repo)
+    
+    # Schedule background sync
+    background_tasks.add_task(sync_repository_data, repo["id"], current_user.id)
+    
+    return {"message": f"Repository {github_repo['full_name']} added successfully", "repository": Repository(**repo)}
+
 @api_router.post("/repositories/import")
 async def import_repositories(
     background_tasks: BackgroundTasks,
