@@ -6,3 +6,14 @@ body {
   margin: 0;
   padding: 0;
 }
+
+/* Hide Emergent watermark */
+[class*="watermark"],
+[class*="Watermark"],
+[id*="watermark"],
+[id*="Watermark"],
+a[href*="emergent"] {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
