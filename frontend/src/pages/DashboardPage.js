@@ -393,16 +393,18 @@ export default function DashboardPage() {
                 <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-lg p-6">
                   <div className="prose prose-invert max-w-none">
                     {insights.insights.split('\n').map((line, i) => {
-                      const isBullet = line.trim().match(/^[\*\-\•]\s/);
-                      const isNumbered = line.trim().match(/^\d+\.\s/);
-                      const isHeader = line.trim().match(/^#+\s/) || (line.trim() && line.trim() === line.trim().toUpperCase() && line.trim().length < 50);
+                      // Remove ** markdown
+                      const cleanLine = line.replace(/\*\*/g, '');
+                      const isBullet = cleanLine.trim().match(/^[\*\-\•]\s/);
+                      const isNumbered = cleanLine.trim().match(/^\d+\.\s/);
+                      const isHeader = cleanLine.trim().match(/^#+\s/) || (cleanLine.trim() && cleanLine.trim() === cleanLine.trim().toUpperCase() && cleanLine.trim().length < 50);
                       
-                      if (!line.trim()) return <div key={i} className="h-3" />;
+                      if (!cleanLine.trim()) return <div key={i} className="h-3" />;
                       
                       if (isHeader) {
                         return (
                           <h4 key={i} className="text-lg font-semibold text-indigo-400 mb-3">
-                            {line.trim().replace(/^#+\s/, '')}
+                            {cleanLine.trim().replace(/^#+\s/, '')}
                           </h4>
                         );
                       }
@@ -412,7 +414,7 @@ export default function DashboardPage() {
                           <div key={i} className="flex gap-3 mb-3">
                             <span className="text-indigo-400 mt-1">•</span>
                             <p className="text-zinc-300 leading-relaxed flex-1">
-                              {line.trim().replace(/^[\*\-\•\d+\.]\s/, '')}
+                              {cleanLine.trim().replace(/^[\*\-\•\d+\.]\s/, '')}
                             </p>
                           </div>
                         );
@@ -420,7 +422,7 @@ export default function DashboardPage() {
                       
                       return (
                         <p key={i} className="text-zinc-300 leading-relaxed mb-3">
-                          {line}
+                          {cleanLine}
                         </p>
                       );
                     })}
