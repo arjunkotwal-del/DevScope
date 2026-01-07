@@ -155,6 +155,51 @@ class DevScopeAPITester:
         )
         return success
 
+    def test_github_oauth_url(self):
+        """Test GET /api/auth/github/login (get OAuth URL)"""
+        success, response = self.run_test(
+            "Get GitHub OAuth URL",
+            "GET",
+            "auth/github/login",
+            200
+        )
+        if success and 'auth_url' in response:
+            print(f"   OAuth URL: {response['auth_url'][:100]}...")
+            # Verify URL structure
+            auth_url = response['auth_url']
+            if 'github.com/login/oauth/authorize' in auth_url and 'client_id=' in auth_url:
+                print("   ✅ OAuth URL structure is correct")
+            else:
+                print("   ❌ OAuth URL structure is incorrect")
+        return success
+
+    def test_import_repositories_without_github(self):
+        """Test POST /api/repositories/import (expect error without GitHub token)"""
+        success, response = self.run_test(
+            "Import repositories without GitHub token",
+            "POST",
+            "repositories/import",
+            400  # Expecting 400 error
+        )
+        return success
+
+    def test_unauthorized_requests(self):
+        """Test API endpoints without authentication"""
+        # Temporarily remove token
+        original_token = self.token
+        self.token = None
+        
+        success, response = self.run_test(
+            "Unauthorized request to /repositories",
+            "GET",
+            "repositories",
+            401  # Expecting 401 Unauthorized
+        )
+        
+        # Restore token
+        self.token = original_token
+        return success
+
 def main():
     print("🚀 Starting DevScope API Testing...")
     print("=" * 60)
