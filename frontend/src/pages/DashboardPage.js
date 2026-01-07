@@ -243,7 +243,7 @@ export default function DashboardPage() {
             )}
           </div>
 
-      {selectedRepo && (
+          {selectedRepo && (
         <>
           {/* Repository Health Score */}
           {healthData && (
