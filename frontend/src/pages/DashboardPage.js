@@ -389,16 +389,56 @@ export default function DashboardPage() {
               </Button>
             </div>
             {insights ? (
-              <div className="prose prose-invert max-w-none">
-                <p className="text-zinc-300 whitespace-pre-wrap leading-relaxed">{insights.insights}</p>
-                <p className="text-xs text-zinc-600 mt-4">
-                  Generated at {new Date(insights.generated_at).toLocaleString()}
-                </p>
+              <div className="space-y-6">
+                <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-lg p-6">
+                  <div className="prose prose-invert max-w-none">
+                    {insights.insights.split('\n').map((line, i) => {
+                      const isBullet = line.trim().match(/^[\*\-\•]\s/);
+                      const isNumbered = line.trim().match(/^\d+\.\s/);
+                      const isHeader = line.trim().match(/^#+\s/) || (line.trim() && line.trim() === line.trim().toUpperCase() && line.trim().length < 50);
+                      
+                      if (!line.trim()) return <div key={i} className="h-3" />;
+                      
+                      if (isHeader) {
+                        return (
+                          <h4 key={i} className="text-lg font-semibold text-indigo-400 mb-3">
+                            {line.trim().replace(/^#+\s/, '')}
+                          </h4>
+                        );
+                      }
+                      
+                      if (isBullet || isNumbered) {
+                        return (
+                          <div key={i} className="flex gap-3 mb-3">
+                            <span className="text-indigo-400 mt-1">•</span>
+                            <p className="text-zinc-300 leading-relaxed flex-1">
+                              {line.trim().replace(/^[\*\-\•\d+\.]\s/, '')}
+                            </p>
+                          </div>
+                        );
+                      }
+                      
+                      return (
+                        <p key={i} className="text-zinc-300 leading-relaxed mb-3">
+                          {line}
+                        </p>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-xs text-zinc-600">
+                  <span>Powered by Gemini 3 Flash</span>
+                  <span>Generated {new Date(insights.generated_at).toLocaleString()}</span>
+                </div>
               </div>
             ) : (
-              <p className="text-zinc-500 text-center py-8">
-                Click "Generate Insights" to get AI-powered analysis of this repository
-              </p>
+              <div className="text-center py-12 bg-zinc-950/30 rounded-lg border border-dashed border-zinc-800">
+                <Sparkles className="h-12 w-12 text-zinc-700 mx-auto mb-4" />
+                <p className="text-zinc-500 mb-2">No insights generated yet</p>
+                <p className="text-zinc-600 text-sm">
+                  Click "Generate Insights" to get AI-powered analysis of this repository
+                </p>
+              </div>
             )}
           </Card>
         </>
