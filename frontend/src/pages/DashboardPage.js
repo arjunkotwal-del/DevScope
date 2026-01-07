@@ -4,8 +4,11 @@ import { Card } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Skeleton } from '../components/ui/skeleton';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { GitBranch, GitPullRequest, Code2, TrendingUp, Activity, Sparkles, BarChart3, Users, Download, RefreshCw, Github } from 'lucide-react';
+import { GitBranch, GitPullRequest, Code2, TrendingUp, Activity, Sparkles, BarChart3, Users, Download, RefreshCw, Github, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -14,6 +17,9 @@ const API = `${BACKEND_URL}/api`;
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
+  const [addingRepo, setAddingRepo] = useState(false);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [repoUrl, setRepoUrl] = useState('');
   const [repositories, setRepositories] = useState([]);
   const [overview, setOverview] = useState(null);
   const [selectedRepo, setSelectedRepo] = useState(null);
