@@ -121,8 +121,8 @@ export default function AuthPage() {
                 >
                   {loading ? 'Signing in...' : 'Sign In'}
                 </Button>
-                <p className="text-xs text-zinc-500 text-center">
-                  Demo: [email protected] / demo123
+                  <p className="text-xs text-zinc-500 text-center">
+                  Demo: demo@devscope.com / demo123
                 </p>
               </form>
             </TabsContent>
