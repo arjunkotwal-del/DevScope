@@ -73,12 +73,38 @@ export default function DashboardPage() {
     } catch (error) {
       const errorMsg = error.response?.data?.detail || 'Failed to import repositories';
       if (errorMsg.includes('GitHub token not found')) {
-        toast.error('Please login with GitHub to import repositories');
+        toast.error('Please connect GitHub in Settings to import repositories');
       } else {
         toast.error(errorMsg);
       }
     } finally {
       setImporting(false);
+    }
+  };
+
+  const addRepository = async () => {
+    if (!repoUrl.trim()) {
+      toast.error('Please enter a repository URL');
+      return;
+    }
+
+    setAddingRepo(true);
+    try {
+      const token = localStorage.getItem('devscope_token');
+      const response = await axios.post(
+        `${API}/repositories/add`,
+        { repo_url: repoUrl },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success(response.data.message || 'Repository added successfully');
+      setShowAddDialog(false);
+      setRepoUrl('');
+      await fetchData();
+    } catch (error) {
+      const errorMsg = error.response?.data?.detail || 'Failed to add repository';
+      toast.error(errorMsg);
+    } finally {
+      setAddingRepo(false);
     }
   };
 
