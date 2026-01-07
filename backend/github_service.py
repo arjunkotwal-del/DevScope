@@ -20,7 +20,12 @@ class GitHubService:
     
     def get_oauth_url(self, state: str) -> str:
         """Generate GitHub OAuth authorization URL"""
-        redirect_uri = f"{os.environ.get('REACT_APP_BACKEND_URL', 'http://localhost:8001')}/api/auth/github/callback"
+        # Use FRONTEND_URL as the base since backend is accessible at the same domain
+        backend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3000').replace(':3000', ':8001')
+        if 'localhost' not in backend_url:
+            # For production, backend is accessible at the same domain as frontend
+            backend_url = os.environ.get('FRONTEND_URL', 'https://gitmetrics.preview.emergentagent.com')
+        redirect_uri = f"{backend_url}/api/auth/github/callback"
         scope = "user repo read:org"
         return f"{self.OAUTH_URL}/authorize?client_id={self.client_id}&redirect_uri={redirect_uri}&scope={scope}&state={state}"
     
