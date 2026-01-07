@@ -20,14 +20,20 @@ class GitHubService:
     
     def get_oauth_url(self, state: str) -> str:
         """Generate GitHub OAuth authorization URL"""
-        # Use FRONTEND_URL as the base since backend is accessible at the same domain
-        backend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3000').replace(':3000', ':8001')
-        if 'localhost' not in backend_url:
-            # For production, backend is accessible at the same domain as frontend
-            backend_url = os.environ.get('FRONTEND_URL', 'https://gitmetrics.preview.emergentagent.com')
+        from urllib.parse import urlencode
+        
+        # Use production backend URL
+        backend_url = os.environ.get('REACT_APP_BACKEND_URL', 'http://localhost:8001')
         redirect_uri = f"{backend_url}/api/auth/github/callback"
-        scope = "user repo read:org"
-        return f"{self.OAUTH_URL}/authorize?client_id={self.client_id}&redirect_uri={redirect_uri}&scope={scope}&state={state}"
+        
+        params = {
+            "client_id": self.client_id,
+            "redirect_uri": redirect_uri,
+            "scope": "user repo read:org",
+            "state": state
+        }
+        
+        return f"{self.OAUTH_URL}/authorize?{urlencode(params)}"
     
     async def exchange_code_for_token(self, code: str) -> Optional[str]:
         """Exchange OAuth code for access token"""
