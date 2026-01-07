@@ -436,7 +436,7 @@ export default function DashboardPage() {
                 <Sparkles className="h-12 w-12 text-zinc-700 mx-auto mb-4" />
                 <p className="text-zinc-500 mb-2">No insights generated yet</p>
                 <p className="text-zinc-600 text-sm">
-                  Click "Generate Insights" to get AI-powered analysis of this repository
+                  Click &quot;Generate Insights&quot; to get AI-powered analysis of this repository
                 </p>
               </div>
             )}
