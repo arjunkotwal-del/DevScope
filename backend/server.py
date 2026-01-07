@@ -540,25 +540,56 @@ async def generate_insights(repo_id: str, current_user: User = Depends(get_curre
     prs = await db.pull_requests.find({"repository_id": repo_id}, {"_id": 0}).to_list(500)
     health = await db.health_scores.find_one({"repository_id": repo_id}, {"_id": 0}, sort=[("computed_at", -1)])
     
+    # Get file types and commit patterns
+    file_changes = {}
+    commit_messages = []
+    authors = set()
+    
+    for commit in commits[:100]:
+        authors.add(commit.get("author", "Unknown"))
+        commit_messages.append(commit.get("message", ""))
+    
     metrics_summary = f"""Repository: {repo['full_name']}
+Language: {repo.get('language', 'Unknown')}
+Description: {repo.get('description', 'No description')}
 Total Commits: {len(commits)}
 Total Pull Requests: {len(prs)}
+Contributors: {len(authors)}
 Health Score: {health.get('overall_score', 'N/A') if health else 'Not computed'}
 Commit Frequency Score: {health.get('commit_frequency_score', 'N/A') if health else 'N/A'}
 PR Velocity Score: {health.get('pr_velocity_score', 'N/A') if health else 'N/A'}
 Code Quality Score: {health.get('code_quality_score', 'N/A') if health else 'N/A'}
 Collaboration Score: {health.get('collaboration_score', 'N/A') if health else 'N/A'}
+
+Recent commit messages (sample):
+{chr(10).join(commit_messages[:10])}
 """
     
     try:
         chat = LlmChat(
             api_key=os.environ.get('EMERGENT_LLM_KEY'),
             session_id=f"insights_{repo_id}_{datetime.now(timezone.utc).timestamp()}",
-            system_message="You are an engineering analytics expert. Analyze repository metrics and provide actionable insights for engineering teams."
+            system_message="You are an expert engineering analyst who specializes in understanding codebases and development patterns. Provide detailed, insightful analysis."
         ).with_model("gemini", "gemini-3-flash-preview")
         
         message = UserMessage(
-            text=f"Analyze these repository metrics and provide 3-5 actionable insights focusing on: velocity trends, potential bottlenecks, code health concerns, and collaboration patterns. Be specific and data-driven.\n\n{metrics_summary}"
+            text=f"""Analyze this GitHub repository and provide a comprehensive, detailed analysis:
+
+{metrics_summary}
+
+Please provide:
+
+1. CODEBASE OVERVIEW: Based on the repository name, language, and commit messages, explain what this codebase is about. What does this project do? What problem does it solve? What type of application/service is it?
+
+2. DEVELOPMENT PATTERNS: Analyze the commit messages and activity. What are the main areas of development? What features or improvements are being worked on?
+
+3. ENGINEERING VELOCITY: Evaluate the team's development speed and patterns. Are they shipping consistently? Any concerning trends?
+
+4. CODE HEALTH ANALYSIS: Based on the health scores, what are the strengths and weaknesses? What needs attention?
+
+5. ACTIONABLE RECOMMENDATIONS: Provide 3-5 specific, data-driven recommendations to improve velocity, quality, or collaboration.
+
+Be detailed and insightful. Focus on understanding what the codebase does and how the team is working."""
         )
         
         response = await chat.send_message(message)
