@@ -1,5 +1,6 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Query, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import RedirectResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -12,6 +13,7 @@ import uuid
 from datetime import datetime, timezone, timedelta
 import jwt
 from passlib.context import CryptContext
+from github_service import github_service
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -38,6 +40,8 @@ class User(BaseModel):
     name: str
     avatar_url: Optional[str] = None
     github_token: Optional[str] = None
+    github_id: Optional[int] = None
+    github_username: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class UserCreate(BaseModel):
@@ -135,7 +139,152 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail="User not found")
     return User(**user)
 
-# Auth endpoints
+# Background sync task
+async def sync_repository_data(repo_id: str, user_id: str):
+    """Background task to sync repository data from GitHub"""
+    try:
+        user = await db.users.find_one({"id": user_id}, {"_id": 0})
+        repo = await db.repositories.find_one({"id": repo_id}, {"_id": 0})
+        
+        if not user or not repo or not user.get("github_token"):
+            return
+        
+        token = user["github_token"]
+        owner = repo["owner"]
+        repo_name = repo["name"]
+        
+        # Fetch commits
+        commits_data = await github_service.get_repo_commits(token, owner, repo_name)
+        
+        for commit_data in commits_data:
+            commit_sha = commit_data.get("sha")
+            
+            # Check if commit already exists
+            existing = await db.commits.find_one({"sha": commit_sha})
+            if existing:
+                continue
+            
+            # Get detailed commit info
+            commit_details = await github_service.get_commit_details(token, owner, repo_name, commit_sha)
+            
+            if commit_details:
+                commit = {
+                    "id": str(uuid.uuid4()),
+                    "repository_id": repo_id,
+                    "sha": commit_sha,
+                    "author": commit_data.get("commit", {}).get("author", {}).get("name", "Unknown"),
+                    "author_email": commit_data.get("commit", {}).get("author", {}).get("email", ""),
+                    "message": commit_data.get("commit", {}).get("message", ""),
+                    "timestamp": commit_data.get("commit", {}).get("author", {}).get("date", datetime.now(timezone.utc).isoformat()),
+                    "files_changed": len(commit_details.get("files", [])),
+                    "additions": commit_details.get("stats", {}).get("additions", 0),
+                    "deletions": commit_details.get("stats", {}).get("deletions", 0),
+                    "url": commit_data.get("html_url", "")
+                }
+                
+                await db.commits.insert_one(commit)
+        
+        # Fetch pull requests
+        prs_data = await github_service.get_repo_pulls(token, owner, repo_name)
+        
+        for pr_data in prs_data:
+            pr_number = pr_data.get("number")
+            
+            # Check if PR already exists
+            existing = await db.pull_requests.find_one({"github_id": pr_data.get("id")})
+            if existing:
+                continue
+            
+            pr = {
+                "id": str(uuid.uuid4()),
+                "repository_id": repo_id,
+                "github_id": pr_data.get("id"),
+                "number": pr_number,
+                "title": pr_data.get("title", ""),
+                "author": pr_data.get("user", {}).get("login", "Unknown"),
+                "state": pr_data.get("state", "open"),
+                "created_at": pr_data.get("created_at", datetime.now(timezone.utc).isoformat()),
+                "merged_at": pr_data.get("merged_at"),
+                "closed_at": pr_data.get("closed_at"),
+                "additions": pr_data.get("additions", 0),
+                "deletions": pr_data.get("deletions", 0),
+                "changed_files": pr_data.get("changed_files", 0),
+                "comments": pr_data.get("comments", 0),
+                "url": pr_data.get("html_url", "")
+            }
+            
+            await db.pull_requests.insert_one(pr)
+        
+        # Update last_synced
+        await db.repositories.update_one(
+            {"id": repo_id},
+            {"$set": {"last_synced": datetime.now(timezone.utc).isoformat()}}
+        )
+        
+        print(f"Successfully synced repository {repo_name}")
+        
+    except Exception as e:
+        print(f"Error syncing repository: {e}")
+
+# GitHub OAuth endpoints
+@api_router.get("/auth/github/login")
+async def github_login():
+    """Initiate GitHub OAuth flow"""
+    state = str(uuid.uuid4())
+    auth_url = github_service.get_oauth_url(state)
+    return {"auth_url": auth_url}
+
+@api_router.get("/auth/github/callback")
+async def github_callback(code: str = Query(...), state: str = Query(...)):
+    """Handle GitHub OAuth callback"""
+    # Exchange code for token
+    access_token = await github_service.exchange_code_for_token(code)
+    
+    if not access_token:
+        return RedirectResponse(url=f"{os.environ.get('FRONTEND_URL')}/?error=auth_failed")
+    
+    # Get user info from GitHub
+    github_user = await github_service.get_user_info(access_token)
+    
+    if not github_user:
+        return RedirectResponse(url=f"{os.environ.get('FRONTEND_URL')}/?error=user_fetch_failed")
+    
+    # Check if user exists
+    existing_user = await db.users.find_one({"github_id": github_user["id"]}, {"_id": 0})
+    
+    if existing_user:
+        # Update token
+        await db.users.update_one(
+            {"id": existing_user["id"]},
+            {"$set": {
+                "github_token": access_token,
+                "avatar_url": github_user.get("avatar_url"),
+                "github_username": github_user.get("login")
+            }}
+        )
+        user_id = existing_user["id"]
+    else:
+        # Create new user
+        user = {
+            "id": str(uuid.uuid4()),
+            "email": github_user.get("email") or f"{github_user['login']}@github.com",
+            "name": github_user.get("name") or github_user["login"],
+            "avatar_url": github_user.get("avatar_url"),
+            "github_token": access_token,
+            "github_id": github_user["id"],
+            "github_username": github_user.get("login"),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.users.insert_one(user)
+        user_id = user["id"]
+    
+    # Create JWT token
+    jwt_token = create_access_token({"user_id": user_id, "email": github_user.get("email")})
+    
+    # Redirect to frontend with token
+    return RedirectResponse(url=f"{os.environ.get('FRONTEND_URL')}/auth/callback?token={jwt_token}")
+
+# Regular auth endpoints
 @api_router.post("/auth/register")
 async def register(user_data: UserCreate):
     existing = await db.users.find_one({"email": user_data.email}, {"_id": 0})
@@ -181,6 +330,66 @@ async def get_repositories(current_user: User = Depends(get_current_user)):
             repo["last_synced"] = datetime.fromisoformat(repo["last_synced"])
     return repos
 
+@api_router.post("/repositories/import")
+async def import_repositories(
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user)
+):
+    """Import repositories from GitHub"""
+    if not current_user.github_token:
+        raise HTTPException(status_code=400, detail="GitHub token not found. Please login with GitHub.")
+    
+    # Fetch repos from GitHub
+    github_repos = await github_service.get_user_repos(current_user.github_token)
+    
+    imported_count = 0
+    for github_repo in github_repos:
+        # Check if already imported
+        existing = await db.repositories.find_one({"github_id": github_repo["id"]})
+        if existing:
+            continue
+        
+        repo = {
+            "id": str(uuid.uuid4()),
+            "user_id": current_user.id,
+            "github_id": github_repo["id"],
+            "name": github_repo["name"],
+            "full_name": github_repo["full_name"],
+            "owner": github_repo["owner"]["login"],
+            "description": github_repo.get("description"),
+            "url": github_repo["html_url"],
+            "is_private": github_repo["private"],
+            "language": github_repo.get("language"),
+            "stars": github_repo.get("stargazers_count", 0),
+            "forks": github_repo.get("forks_count", 0),
+            "last_synced": None,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        result = await db.repositories.insert_one(repo)
+        imported_count += 1
+        
+        # Schedule background sync for first 5 repos
+        if imported_count <= 5:
+            background_tasks.add_task(sync_repository_data, repo["id"], current_user.id)
+    
+    return {"message": f"Imported {imported_count} repositories", "count": imported_count}
+
+@api_router.post("/repositories/sync/{repo_id}")
+async def sync_repository(
+    repo_id: str,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user)
+):
+    """Trigger background sync for a repository"""
+    repo = await db.repositories.find_one({"id": repo_id, "user_id": current_user.id}, {"_id": 0})
+    if not repo:
+        raise HTTPException(status_code=404, detail="Repository not found")
+    
+    background_tasks.add_task(sync_repository_data, repo_id, current_user.id)
+    
+    return {"message": "Repository sync initiated", "repository_id": repo_id}
+
 @api_router.get("/repositories/{repo_id}", response_model=Repository)
 async def get_repository(repo_id: str, current_user: User = Depends(get_current_user)):
     repo = await db.repositories.find_one({"id": repo_id, "user_id": current_user.id}, {"_id": 0})
@@ -201,19 +410,20 @@ async def get_analytics_overview(current_user: User = Depends(get_current_user))
     total_commits = await db.commits.count_documents({"repository_id": {"$in": repo_ids}})
     total_prs = await db.pull_requests.count_documents({"repository_id": {"$in": repo_ids}})
     
-    # Get recent commits for trend
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     recent_commits = await db.commits.find(
         {"repository_id": {"$in": repo_ids}},
-        {"_id": 0, "timestamp": 1, "additions": 1, "deletions": 1}
+        {"_id": 0, "timestamp": 1}
     ).to_list(1000)
+    
+    recent_count = sum(1 for c in recent_commits if datetime.fromisoformat(c["timestamp"]) > thirty_days_ago) if recent_commits else 0
     
     return {
         "total_repositories": len(repos),
         "total_commits": total_commits,
         "total_pull_requests": total_prs,
         "active_repositories": len([r for r in repos if r.get("last_synced")]),
-        "recent_commits": len([c for c in recent_commits if datetime.fromisoformat(c["timestamp"]) > thirty_days_ago]) if recent_commits and len(recent_commits) > 0 and isinstance(recent_commits[0].get("timestamp"), str) else 0
+        "recent_commits": recent_count
     }
 
 @api_router.get("/analytics/commits/{repo_id}")
@@ -227,7 +437,6 @@ async def get_commit_analytics(repo_id: str, current_user: User = Depends(get_cu
         {"_id": 0}
     ).sort("timestamp", -1).to_list(500)
     
-    # Group by day for trend
     daily_commits = {}
     for commit in commits:
         ts = commit.get("timestamp")
@@ -261,9 +470,8 @@ async def get_pr_analytics(repo_id: str, current_user: User = Depends(get_curren
         {"_id": 0}
     ).to_list(500)
     
-    merged_prs = [pr for pr in prs if pr.get("state") == "merged"]
+    merged_prs = [pr for pr in prs if pr.get("state") == "merged" or pr.get("merged_at")]
     
-    # Calculate review turnaround time
     turnaround_times = []
     for pr in merged_prs:
         if pr.get("created_at") and pr.get("merged_at"):
@@ -287,24 +495,19 @@ async def get_repository_health(repo_id: str, current_user: User = Depends(get_c
     if not repo:
         raise HTTPException(status_code=404, detail="Repository not found")
     
-    # Calculate health metrics
     commits = await db.commits.find({"repository_id": repo_id}, {"_id": 0}).to_list(1000)
     prs = await db.pull_requests.find({"repository_id": repo_id}, {"_id": 0}).to_list(500)
     
-    # Commit frequency score (last 30 days)
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
-    recent_commits = [c for c in commits if datetime.fromisoformat(c["timestamp"]) > thirty_days_ago] if commits and len(commits) > 0 and isinstance(commits[0].get("timestamp"), str) else []
+    recent_commits = [c for c in commits if datetime.fromisoformat(c["timestamp"]) > thirty_days_ago] if commits else []
     commit_frequency_score = min(len(recent_commits) / 30 * 10, 100)
     
-    # PR velocity score
-    merged_prs = [pr for pr in prs if pr.get("state") == "merged"]
+    merged_prs = [pr for pr in prs if pr.get("state") == "merged" or pr.get("merged_at")]
     pr_velocity_score = min(len(merged_prs) / max(len(prs), 1) * 100, 100) if prs else 50
     
-    # Code quality score (based on PR size)
     avg_pr_size = sum(pr.get("additions", 0) + pr.get("deletions", 0) for pr in prs) / len(prs) if prs else 0
     code_quality_score = max(100 - (avg_pr_size / 50), 30) if avg_pr_size > 0 else 70
     
-    # Collaboration score (based on unique contributors)
     unique_authors = set(c.get("author") for c in commits if c.get("author"))
     collaboration_score = min(len(unique_authors) * 20, 100)
     
@@ -333,7 +536,6 @@ async def generate_insights(repo_id: str, current_user: User = Depends(get_curre
     if not repo:
         raise HTTPException(status_code=404, detail="Repository not found")
     
-    # Gather metrics
     commits = await db.commits.find({"repository_id": repo_id}, {"_id": 0}).to_list(1000)
     prs = await db.pull_requests.find({"repository_id": repo_id}, {"_id": 0}).to_list(500)
     health = await db.health_scores.find_one({"repository_id": repo_id}, {"_id": 0}, sort=[("computed_at", -1)])
@@ -369,21 +571,6 @@ Collaboration Score: {health.get('collaboration_score', 'N/A') if health else 'N
     except Exception as e:
         logging.error(f"Error generating insights: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to generate insights: {str(e)}")
-
-@api_router.post("/repositories/sync/{repo_id}")
-async def sync_repository(repo_id: str, current_user: User = Depends(get_current_user)):
-    """Trigger background sync for a repository"""
-    repo = await db.repositories.find_one({"id": repo_id, "user_id": current_user.id}, {"_id": 0})
-    if not repo:
-        raise HTTPException(status_code=404, detail="Repository not found")
-    
-    # Update last_synced timestamp
-    await db.repositories.update_one(
-        {"id": repo_id},
-        {"$set": {"last_synced": datetime.now(timezone.utc).isoformat()}}
-    )
-    
-    return {"message": "Repository sync initiated", "repository_id": repo_id}
 
 app.include_router(api_router)
 
