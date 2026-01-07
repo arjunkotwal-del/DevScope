@@ -17,7 +17,7 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('login');
   
-  const [loginData, setLoginData] = useState({ email: 'demo@devscope.com', password: 'demo123' });
+  const [loginData, setLoginData] = useState({ email: '', password: '' });
   const [registerData, setRegisterData] = useState({ email: '', name: '', password: '' });
 
   const handleGitHubLogin = async () => {
