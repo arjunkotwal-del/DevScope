@@ -643,7 +643,7 @@ Recent commit messages (sample):
         chat = LlmChat(
             api_key=os.environ.get('EMERGENT_LLM_KEY'),
             session_id=f"insights_{repo_id}_{datetime.now(timezone.utc).timestamp()}",
-            system_message="You are an expert engineering analyst who specializes in understanding codebases and development patterns. Provide detailed, insightful analysis."
+            system_message="You are an expert engineering analyst who specializes in understanding codebases and development patterns."
         ).with_model("gemini", "gemini-3-flash-preview")
         
         message = UserMessage(
