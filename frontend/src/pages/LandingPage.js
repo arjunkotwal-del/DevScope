@@ -59,14 +59,6 @@ export default function LandingPage() {
                 <Github className="h-5 w-5 mr-2" />
                 Start Free
               </Button>
-              <Button
-                onClick={() => navigate('/auth')}
-                size="lg"
-                variant="outline"
-                className="border-zinc-700 text-lg h-14 px-8"
-              >
-                View Demo
-              </Button>
             </div>
           </div>
         </div>
