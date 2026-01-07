@@ -34,9 +34,10 @@ export default function DashboardPage() {
 
   const fetchData = async () => {
     try {
+      const token = localStorage.getItem('devscope_token');
       const [reposRes, overviewRes] = await Promise.all([
-        axios.get(`${API}/repositories`),
-        axios.get(`${API}/analytics/overview`)
+        axios.get(`${API}/repositories`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`${API}/analytics/overview`, { headers: { Authorization: `Bearer ${token}` } })
       ]);
       setRepositories(reposRes.data);
       setOverview(overviewRes.data);
