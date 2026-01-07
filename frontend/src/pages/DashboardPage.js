@@ -178,15 +178,59 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-bold text-white mb-2">Engineering Analytics</h1>
           <p className="text-zinc-400">Real-time insights across your repositories</p>
         </div>
-        <Button
-          onClick={importRepositories}
-          disabled={importing}
-          className="bg-indigo-600 hover:bg-indigo-700"
-          data-testid="import-repos-button"
-        >
-          <Download className="h-4 w-4 mr-2" />
-          {importing ? 'Importing...' : 'Import from GitHub'}
-        </Button>
+        <div className="flex gap-3">
+          <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                className="border-zinc-700"
+                data-testid="add-repo-button"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Repository
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-zinc-900 border-zinc-800">
+              <DialogHeader>
+                <DialogTitle className="text-white">Add GitHub Repository</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="repo-url" className="text-zinc-300">Repository URL</Label>
+                  <Input
+                    id="repo-url"
+                    data-testid="repo-url-input"
+                    placeholder="https://github.com/owner/repository"
+                    value={repoUrl}
+                    onChange={(e) => setRepoUrl(e.target.value)}
+                    className="bg-zinc-950 border-zinc-700 text-white"
+                  />
+                  <p className="text-xs text-zinc-500">
+                    Enter the full GitHub URL of the repository you want to analyze
+                  </p>
+                </div>
+                <Button
+                  onClick={addRepository}
+                  disabled={addingRepo}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700"
+                  data-testid="add-repo-submit"
+                >
+                  {addingRepo ? 'Adding...' : 'Add Repository'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+          
+          <Button
+            onClick={importRepositories}
+            disabled={importing}
+            className="bg-indigo-600 hover:bg-indigo-700"
+            data-testid="import-repos-button"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            {importing ? 'Importing...' : 'Import All'}
+          </Button>
+        </div>
       </div>
 
       {/* Overview Stats */}
