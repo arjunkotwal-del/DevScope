@@ -504,8 +504,7 @@ export default function DashboardPage() {
                     })}
                   </div>
                 </div>
-                <div className="flex items-center justify-between text-xs text-zinc-600">
-                  <span>Powered by Gemini 3 Flash</span>
+                <div className="flex items-center justify-end text-xs text-zinc-600">
                   <span>Generated {new Date(insights.generated_at).toLocaleString()}</span>
                 </div>
               </div>
