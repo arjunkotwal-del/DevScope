@@ -161,7 +161,7 @@ export default function LandingPage() {
       {/* Footer */}
       <div className="border-t border-zinc-800 py-8">
         <div className="max-w-7xl mx-auto px-6 text-center text-zinc-500 text-sm">
-          © 2025 DevScope. Built for engineering teams.
+          © 2025 DevScope. All rights reserved.
         </div>
       </div>
     </div>
