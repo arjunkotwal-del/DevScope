@@ -5,7 +5,7 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Skeleton } from '../components/ui/skeleton';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { GitBranch, GitPullRequest, Code2, TrendingUp, Activity, Sparkles, BarChart3, Users } from 'lucide-react';
+import { GitBranch, GitPullRequest, Code2, TrendingUp, Activity, Sparkles, BarChart3, Users, Download, RefreshCw, Github } from 'lucide-react';
 import { toast } from 'sonner';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -13,6 +13,7 @@ const API = `${BACKEND_URL}/api`;
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
   const [repositories, setRepositories] = useState([]);
   const [overview, setOverview] = useState(null);
   const [selectedRepo, setSelectedRepo] = useState(null);
@@ -52,12 +53,36 @@ export default function DashboardPage() {
     }
   };
 
+  const importRepositories = async () => {
+    setImporting(true);
+    try {
+      const token = localStorage.getItem('devscope_token');
+      const response = await axios.post(
+        `${API}/repositories/import`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success(response.data.message || 'Repositories imported successfully');
+      await fetchData();
+    } catch (error) {
+      const errorMsg = error.response?.data?.detail || 'Failed to import repositories';
+      if (errorMsg.includes('GitHub token not found')) {
+        toast.error('Please login with GitHub to import repositories');
+      } else {
+        toast.error(errorMsg);
+      }
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const fetchRepoAnalytics = async (repoId) => {
     try {
+      const token = localStorage.getItem('devscope_token');
       const [commits, prs, health] = await Promise.all([
-        axios.get(`${API}/analytics/commits/${repoId}`),
-        axios.get(`${API}/analytics/pull-requests/${repoId}`),
-        axios.get(`${API}/analytics/health/${repoId}`)
+        axios.get(`${API}/analytics/commits/${repoId}`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`${API}/analytics/pull-requests/${repoId}`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`${API}/analytics/health/${repoId}`, { headers: { Authorization: `Bearer ${token}` } })
       ]);
       setCommitData(commits.data);
       setPrData(prs.data);
@@ -71,7 +96,12 @@ export default function DashboardPage() {
     if (!selectedRepo) return;
     setLoadingInsights(true);
     try {
-      const response = await axios.post(`${API}/insights/generate/${selectedRepo.id}`);
+      const token = localStorage.getItem('devscope_token');
+      const response = await axios.post(
+        `${API}/insights/generate/${selectedRepo.id}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       setInsights(response.data);
       toast.success('AI insights generated!');
     } catch (error) {
@@ -84,9 +114,14 @@ export default function DashboardPage() {
 
   const syncRepo = async (repoId) => {
     try {
-      await axios.post(`${API}/repositories/sync/${repoId}`);
+      const token = localStorage.getItem('devscope_token');
+      await axios.post(
+        `${API}/repositories/sync/${repoId}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       toast.success('Repository sync initiated');
-      fetchData();
+      await fetchData();
     } catch (error) {
       toast.error('Failed to sync repository');
     }
@@ -111,6 +146,15 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-bold text-white mb-2">Engineering Analytics</h1>
           <p className="text-zinc-400">Real-time insights across your repositories</p>
         </div>
+        <Button
+          onClick={importRepositories}
+          disabled={importing}
+          className="bg-indigo-600 hover:bg-indigo-700"
+          data-testid="import-repos-button"
+        >
+          <Download className="h-4 w-4 mr-2" />
+          {importing ? 'Importing...' : 'Import from GitHub'}
+        </Button>
       </div>
 
       {/* Overview Stats */}
