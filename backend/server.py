@@ -490,7 +490,7 @@ async def get_analytics_overview(current_user: User = Depends(get_current_user))
         {"_id": 0, "timestamp": 1}
     ).to_list(1000)
     
-    recent_count = sum(1 for c in recent_commits if datetime.fromisoformat(c["timestamp"]) > thirty_days_ago) if recent_commits else 0
+    recent_count = len(recent_commits)
     
     return {
         "total_repositories": len(repos),
