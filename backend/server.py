@@ -579,8 +579,31 @@ async def get_repository_health(repo_id: str, current_user: User = Depends(get_c
     merged_prs = [pr for pr in prs if pr.get("state") == "merged" or pr.get("merged_at")]
     pr_velocity_score = min(len(merged_prs) / max(len(prs), 1) * 100, 100) if prs else 50
     
-    avg_pr_size = sum(pr.get("additions", 0) + pr.get("deletions", 0) for pr in prs) / len(prs) if prs else 0
-    code_quality_score = max(100 - (avg_pr_size / 50), 30) if avg_pr_size > 0 else 70
+    # Code quality score based on multiple factors
+    if prs:
+        # Factor 1: PR size (smaller PRs are better)
+        avg_pr_size = sum(pr.get("additions", 0) + pr.get("deletions", 0) for pr in prs) / len(prs)
+        size_score = max(100 - (avg_pr_size / 10), 20)  # Penalize large PRs more heavily
+        
+        # Factor 2: PR review engagement (comments indicate thorough review)
+        avg_comments = sum(pr.get("comments", 0) for pr in prs) / len(prs)
+        review_score = min(avg_comments * 15, 100)  # More comments = better reviews
+        
+        # Factor 3: Files changed per PR (fewer files = more focused changes)
+        avg_files_changed = sum(pr.get("changed_files", 0) for pr in prs) / len(prs)
+        focus_score = max(100 - (avg_files_changed * 5), 30)
+        
+        # Weighted average
+        code_quality_score = (size_score * 0.5 + review_score * 0.3 + focus_score * 0.2)
+    else:
+        # No PRs - use commit patterns
+        if commits:
+            # Analyze commit sizes
+            avg_commit_size = sum(c.get("additions", 0) + c.get("deletions", 0) for c in commits) / len(commits)
+            # Smaller, frequent commits are better
+            code_quality_score = max(100 - (avg_commit_size / 20), 40)
+        else:
+            code_quality_score = 50  # Neutral score for no data
     
     unique_authors = set(c.get("author") for c in commits if c.get("author"))
     collaboration_score = min(len(unique_authors) * 20, 100)
