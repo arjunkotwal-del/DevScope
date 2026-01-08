@@ -569,14 +569,13 @@ async def get_repository_health(repo_id: str, current_user: User = Depends(get_c
     if not repo:
         raise HTTPException(status_code=404, detail="Repository not found")
     
-    # Gather metrics
     commits = await db.commits.find(
         {"repository_id": repo_id},
-        {"_id": 0, "author": 1, "message": 1}
-    ).to_list(100)
+        {"_id": 0, "timestamp": 1, "author": 1, "additions": 1, "deletions": 1}
+    ).to_list(1000)
     prs = await db.pull_requests.find(
         {"repository_id": repo_id},
-        {"_id": 0}
+        {"_id": 0, "state": 1, "merged_at": 1, "created_at": 1, "closed_at": 1, "additions": 1, "deletions": 1, "comments": 1, "changed_files": 1}
     ).to_list(500)
     
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
