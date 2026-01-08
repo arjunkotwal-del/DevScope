@@ -508,7 +508,7 @@ async def get_commit_analytics(repo_id: str, current_user: User = Depends(get_cu
     
     commits = await db.commits.find(
         {"repository_id": repo_id},
-        {"_id": 0}
+        {"_id": 0, "timestamp": 1, "additions": 1, "deletions": 1}
     ).sort("timestamp", -1).to_list(500)
     
     daily_commits = {}
