@@ -569,8 +569,14 @@ async def get_repository_health(repo_id: str, current_user: User = Depends(get_c
     if not repo:
         raise HTTPException(status_code=404, detail="Repository not found")
     
-    commits = await db.commits.find({"repository_id": repo_id}, {"_id": 0}).to_list(1000)
-    prs = await db.pull_requests.find({"repository_id": repo_id}, {"_id": 0}).to_list(500)
+    commits = await db.commits.find(
+        {"repository_id": repo_id},
+        {"_id": 0, "timestamp": 1, "author": 1, "additions": 1, "deletions": 1}
+    ).to_list(1000)
+    prs = await db.pull_requests.find(
+        {"repository_id": repo_id},
+        {"_id": 0, "state": 1, "merged_at": 1, "created_at": 1, "closed_at": 1, "additions": 1, "deletions": 1, "comments": 1, "changed_files": 1}
+    ).to_list(500)
     
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     recent_commits = [c for c in commits if datetime.fromisoformat(c["timestamp"]) > thirty_days_ago] if commits else []
@@ -633,8 +639,14 @@ async def generate_insights(repo_id: str, current_user: User = Depends(get_curre
     if not repo:
         raise HTTPException(status_code=404, detail="Repository not found")
     
-    commits = await db.commits.find({"repository_id": repo_id}, {"_id": 0}).to_list(1000)
-    prs = await db.pull_requests.find({"repository_id": repo_id}, {"_id": 0}).to_list(500)
+    commits = await db.commits.find(
+        {"repository_id": repo_id},
+        {"_id": 0, "timestamp": 1, "author": 1, "additions": 1, "deletions": 1}
+    ).to_list(1000)
+    prs = await db.pull_requests.find(
+        {"repository_id": repo_id},
+        {"_id": 0, "state": 1, "merged_at": 1, "created_at": 1, "closed_at": 1, "additions": 1, "deletions": 1, "comments": 1, "changed_files": 1}
+    ).to_list(500)
     health = await db.health_scores.find_one({"repository_id": repo_id}, {"_id": 0}, sort=[("computed_at", -1)])
     
     # Get file types and commit patterns
