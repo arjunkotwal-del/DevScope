@@ -22,8 +22,8 @@ class GitHubService:
         """Generate GitHub OAuth authorization URL"""
         from urllib.parse import urlencode
         
-        # Use production backend URL
-        backend_url = os.environ.get('BACKEND_URL', 'https://gitmetrics.preview.emergentagent.com')
+        # Use production backend URL (required - no fallback)
+        backend_url = os.environ['REACT_APP_BACKEND_URL']
         redirect_uri = f"{backend_url}/api/auth/github/callback"
         
         params = {
