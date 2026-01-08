@@ -486,7 +486,7 @@ async def get_analytics_overview(current_user: User = Depends(get_current_user))
     
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     recent_commits = await db.commits.find(
-        {"repository_id": {"$in": repo_ids}},
+        {"repository_id": {"$in": repo_ids}, "timestamp": {"$gte": thirty_days_ago.isoformat()}},
         {"_id": 0, "timestamp": 1}
     ).to_list(1000)
     
